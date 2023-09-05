@@ -2,6 +2,7 @@ from gdown import download, download_folder
 from requests import get
 from os.path import join
 from zipfile import ZipFile
+from os import makedirs
 
 
 def download_file_drive(url: str, output: str, quiet: bool = False) -> None:
@@ -15,6 +16,9 @@ def download_folder_drive(
 
 
 def download_file(url: str, output: str, parent: str = None):
+    if parent:
+        makedirs(parent, exist_ok=True)
+
     path = output if parent is None else join(parent, output)
     request = get(url)
     print(f"Downloading {output} to {path}")
@@ -26,6 +30,9 @@ def download_file(url: str, output: str, parent: str = None):
 def download_zip(url: str, output: str, parent: str = None):
     request = get(url)
     print(f"Downloading {output}")
+
+    if parent:
+        makedirs(parent, exist_ok=True)
 
     temp_path = join("temp", output)
     real_path = output if parent is None else join(parent, output)
