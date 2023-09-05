@@ -162,3 +162,6 @@ cython_debug/
 requirements.txt
 venvLog.txt
 paths.json
+dataset/
+outputs/
+temp/

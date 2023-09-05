@@ -1,9 +1,13 @@
 from tqdm.auto import tqdm
-from typing import Dict, List, Tuple
+from typing import Dict, Tuple
 
-from torch import nn, device, softmax, argmax, inference_mode
+from torch import nn, device, softmax, argmax, inference_mode, Tensor, rand
 from torch.utils.data import DataLoader
 from torch.optim import Optimizer
+
+from torch_utilities.model.generative_helper import gen_noise, get_gp
+from torch_utilities.model.save_load import save_gan_models
+from torch_utilities.plot import save_grid
 
 
 def train_step(
@@ -103,3 +107,116 @@ def train(
         results["test_acc"].append(test_acc)
 
     return results
+
+
+def crit_step(
+    current_batch_size: int,
+    cycles: int,
+    z_dim: int,
+    real: Tensor,
+    gen: nn.Module,
+    crit: nn.Module,
+    crit_opt: Optimizer,
+    device: device,
+) -> float:
+    mean_crit_loss = 0
+
+    for _ in range(cycles):
+        crit_opt.zero_grad()
+
+        noise = gen_noise(current_batch_size, z_dim, device)
+        fake = gen(noise)
+        crit_fake_pred = crit(fake.detach())
+        crit_real_pred = crit(real)
+
+        alpha = rand(len(real), 1, 1, 1, device=device, requires_grad=True)
+        gp = get_gp(real, fake.detach(), crit, alpha)
+
+        crit_loss = crit_fake_pred.mean() - crit_real_pred.mean() + gp
+        mean_crit_loss += crit_loss.item() / cycles
+        crit_loss.backward(retain_graph=True)
+        crit_opt.step()
+
+    return mean_crit_loss
+
+
+def gen_step(
+    current_batch_size: int,
+    z_dim: int,
+    gen: nn.Module,
+    crit: nn.Module,
+    gen_opt: nn.Module,
+    device: device,
+) -> Tuple[float, Tensor]:
+    gen_opt.zero_grad()
+
+    noise = gen_noise(current_batch_size, z_dim, device)
+    fake = gen(noise)
+    crit_fake_pred = crit(fake)
+
+    gen_loss = -crit_fake_pred.mean()
+    gen_loss.backward()
+    gen_opt.step()
+
+    return gen_loss.item(), fake
+
+
+def train_gan(
+    epochs: int,
+    crit_cycles: int,
+    z_dim: int,
+    dataloader: DataLoader,
+    gen: nn.Module,
+    crit: nn.Module,
+    gen_opt: Optimizer,
+    crit_opt: Optimizer,
+    device: device,
+    foldername: str,
+    modelname: str,
+    save_step: int = 100,
+    show_step: int = 100,
+) -> Tuple[list, list]:
+    gen_losses = []
+    crit_losses = []
+    current_step = 0
+
+    for epoch in tqdm(range(epochs), desc="Training"):
+        for real, _ in dataloader:
+            current_batch_size = len(real)
+            real = real.to(device)
+
+            mean_crit_loss = crit_step(
+                current_batch_size,
+                crit_cycles,
+                z_dim,
+                real,
+                gen,
+                crit,
+                crit_opt,
+                device,
+            )
+            crit_losses.append(mean_crit_loss)
+
+            gen_loss, fake = gen_step(
+                current_batch_size, z_dim, gen, crit, gen_opt, device
+            )
+            gen_losses.append(gen_loss)
+
+            if current_step % save_step == 0 and current_step > 0:
+                save_gan_models(
+                    modelname, epochs, gen, gen_opt, crit, crit_opt, foldername
+                )
+
+            if current_step % show_step == 0 and current_step > 0:
+                save_grid(fake, foldername, filename=f"{modelname}-{current_step}")
+
+                gen_mean = sum(gen_losses[-show_step:]) / show_step
+                crit_mean = sum(crit_losses[-show_step:]) / show_step
+
+                print(
+                    f"Epoch : {epoch + 1} | Step : {current_step} | Gen Loss : {gen_mean} | Disc Loss : {crit_mean}"
+                )
+
+            current_step += 1
+
+    return gen_losses, crit_losses
