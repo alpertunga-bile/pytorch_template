@@ -42,3 +42,5 @@ def plot_gan_model_losses(gen_losses: list, crit_losses: list) -> None:
     plt.title("Loss")
     plt.xlabel("Steps")
     plt.legend()
+
+    plt.show()

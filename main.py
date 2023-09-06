@@ -32,7 +32,8 @@ class Generator(nn.Module):
             get_generator_block(d_dim * 32, d_dim * 16),
             get_generator_block(d_dim * 16, d_dim * 8),
             get_generator_block(d_dim * 8, d_dim * 4),
-            nn.ConvTranspose2d(d_dim * 4, 3, 4, 2, 1),
+            get_generator_block(d_dim * 4, d_dim * 2),
+            nn.ConvTranspose2d(d_dim * 2, 3, 4, 2, 1),
             nn.Tanh(),
         )
 
@@ -69,6 +70,7 @@ if __name__ == "__main__":
     gen_opt = Adam(gen.parameters(), lr=lr, betas=(0.5, 0.9))
     crit_opt = Adam(crit.parameters(), lr=lr, betas=(0.5, 0.9))
 
+    """
     gen_losses, crit_losses = train_gan(
         epochs,
         crit_cycles,
@@ -84,5 +86,6 @@ if __name__ == "__main__":
         save_step,
         show_step,
     )
-
+    
     plot_gan_model_losses(gen_losses, crit_losses)
+    """
