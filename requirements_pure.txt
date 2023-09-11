@@ -6,3 +6,4 @@ Pillow
 pandas
 tqdm
 torchinfo
+tensorboard

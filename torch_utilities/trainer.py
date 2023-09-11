@@ -1,5 +1,6 @@
 from tqdm.auto import tqdm
 from typing import Dict, Tuple
+from torch.utils.tensorboard import SummaryWriter
 
 from torch import nn, device, softmax, argmax, inference_mode, Tensor, rand
 from torch.utils.data import DataLoader
@@ -77,6 +78,7 @@ def train(
     loss_func: nn.Module,
     epochs: int,
     device: device,
+    writer: SummaryWriter,
 ) -> Dict[str, list]:
     results = {"train_loss": [], "train_acc": [], "test_loss": [], "test_acc": []}
 
@@ -105,6 +107,27 @@ def train(
         results["train_acc"].append(train_acc)
         results["test_loss"].append(test_loss)
         results["test_acc"].append(test_acc)
+
+        if writer is None:
+            continue
+
+        writer.add_scalars(
+            main_tag="Loss",
+            tag_scalar_dict={"train_loss": train_loss, "test_loss": test_loss},
+            global_step=epoch,
+        )
+
+        writer.add_scalars(
+            main_tag="Accuracy",
+            tag_scalar_dict={"train_acc": train_acc, "test_acc": test_acc},
+            global_step=epoch,
+        )
+
+        # Add example image
+        # writer.add_graph(model=model, input_to_model=)
+
+    if writer:
+        writer.close()
 
     return results
 
@@ -173,6 +196,7 @@ def train_gan(
     device: device,
     foldername: str,
     modelname: str,
+    writer: SummaryWriter = None,
     save_step: int = 100,
     show_step: int = 100,
 ) -> Tuple[list, list]:
@@ -218,5 +242,17 @@ def train_gan(
                 )
 
             current_step += 1
+
+            if writer is None:
+                continue
+
+            writer.add_scalars(
+                main_tag="Loss",
+                tag_scalar_dict={"gan_loss": gen_loss, "crit_loss": mean_crit_loss},
+                global_step=epoch,
+            )
+
+    if writer:
+        writer.close()
 
     return gen_losses, crit_losses
