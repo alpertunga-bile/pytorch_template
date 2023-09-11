@@ -44,3 +44,10 @@ def plot_gan_model_losses(gen_losses: list, crit_losses: list) -> None:
     plt.legend()
 
     plt.show()
+
+
+def show_single_image(img: Tensor, label: str) -> None:
+    plt.imshow(img.permute(1, 2, 0))
+    plt.title(label)
+    plt.axis(False)
+    plt.show()
