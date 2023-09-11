@@ -149,24 +149,28 @@ def crit_step(
     crit: nn.Module,
     crit_opt: Optimizer,
     device: device,
+    scaler: GradScaler,
 ) -> float:
     mean_crit_loss = 0
 
     for _ in range(cycles):
         crit_opt.zero_grad()
 
-        noise = gen_noise(current_batch_size, z_dim, device)
-        fake = gen(noise)
-        crit_fake_pred = crit(fake.detach())
-        crit_real_pred = crit(real)
+        with autocast(device_type=device):
+            noise = gen_noise(current_batch_size, z_dim, device)
+            fake = gen(noise)
+            crit_fake_pred = crit(fake.detach())
+            crit_real_pred = crit(real)
 
-        alpha = rand(len(real), 1, 1, 1, device=device, requires_grad=True)
-        gp = get_gp(real, fake.detach(), crit, alpha)
+            alpha = rand(len(real), 1, 1, 1, device=device, requires_grad=True)
+            gp = get_gp(real, fake.detach(), crit, alpha)
 
-        crit_loss = crit_fake_pred.mean() - crit_real_pred.mean() + gp
-        mean_crit_loss += crit_loss.item() / cycles
-        crit_loss.backward(retain_graph=True)
-        crit_opt.step()
+            crit_loss = crit_fake_pred.mean() - crit_real_pred.mean() + gp
+            mean_crit_loss += crit_loss.item() / cycles
+
+        scaler.scale(crit_loss).backward()
+        scaler.step(crit_opt)
+        scaler.update()
 
     return mean_crit_loss
 
@@ -178,16 +182,20 @@ def gen_step(
     crit: nn.Module,
     gen_opt: nn.Module,
     device: device,
+    scaler: GradScaler,
 ) -> Tuple[float, Tensor]:
     gen_opt.zero_grad()
 
-    noise = gen_noise(current_batch_size, z_dim, device)
-    fake = gen(noise)
-    crit_fake_pred = crit(fake)
+    with autocast(device_type=device):
+        noise = gen_noise(current_batch_size, z_dim, device)
+        fake = gen(noise)
+        crit_fake_pred = crit(fake)
 
-    gen_loss = -crit_fake_pred.mean()
-    gen_loss.backward()
-    gen_opt.step()
+        gen_loss = -crit_fake_pred.mean()
+
+    scaler.scale(gen_loss).backward()
+    scaler.step(gen_opt)
+    scaler.update()
 
     return gen_loss.item(), fake
 
@@ -211,6 +219,7 @@ def train_gan(
     gen_losses = []
     crit_losses = []
     current_step = 0
+    scaler = GradScaler()
 
     for epoch in tqdm(range(epochs), desc="Training"):
         for real, _ in dataloader:
@@ -226,11 +235,12 @@ def train_gan(
                 crit,
                 crit_opt,
                 device,
+                scaler,
             )
             crit_losses.append(mean_crit_loss)
 
             gen_loss, fake = gen_step(
-                current_batch_size, z_dim, gen, crit, gen_opt, device
+                current_batch_size, z_dim, gen, crit, gen_opt, device, scaler
             )
             gen_losses.append(gen_loss)
 
