@@ -1,4 +1,5 @@
-from torch import nn, Tensor
+from torch import nn
+from torch_utilities.consts import available_device
 
 
 class PatchEmbedding(nn.Module):
@@ -25,7 +26,7 @@ class PatchEmbedding(nn.Module):
         # Flat the end of the 2 variables
         self.flatten = nn.Flatten(start_dim=2, end_dim=3)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x):
         image_res = x.shape[-1]
 
         assert (

@@ -9,6 +9,8 @@ from torch.optim import Optimizer
 from torch_utilities.model.generative_helper import gen_noise, get_gp
 from torch_utilities.model.save_load import save_gan_models
 from torch_utilities.plot import save_grid
+from torch import autocast
+from torch.cuda.amp import GradScaler
 
 
 def train_step(
@@ -17,6 +19,7 @@ def train_step(
     loss_func: nn.Module,
     optimizer: Optimizer,
     device: device,
+    scaler: GradScaler,
 ) -> Tuple[float, float]:
     model.train()
 
@@ -25,16 +28,18 @@ def train_step(
     for batch, (X, y) in enumerate(dataloader):
         X, y = X.to(device), y.to(device)
 
-        y_pred = model(X)
+        with autocast(device_type=device):
+            y_pred = model(X)
+            loss = loss_func(y_pred, y)
 
-        loss = loss_func(y_pred, y)
         train_loss += loss.item()
+        scaler.scale(loss).backward()
 
-        optimizer.zero_grad()
+        scaler.step(optimizer)
 
-        loss.backward()
+        scaler.update()
 
-        optimizer.step()
+        optimizer.zero_grad(set_to_none=True)
 
         y_pred_class = argmax(softmax(y_pred, dim=1), dim=1)
         train_acc += (y_pred_class == y).sum().item() / len(y_pred)
@@ -56,9 +61,10 @@ def test_step(
         for batch, (X, y) in enumerate(dataloader):
             X, y = X.to(device), y.to(device)
 
-            test_pred_logits = model(X)
+            with autocast(device_type=device):
+                test_pred_logits = model(X)
+                loss = loss_func(test_pred_logits, y)
 
-            loss = loss_func(test_pred_logits, y)
             test_loss += loss.item()
 
             test_pred_labels = test_pred_logits.argmax(dim=1)
@@ -81,6 +87,7 @@ def train(
     writer: SummaryWriter,
 ) -> Dict[str, list]:
     results = {"train_loss": [], "train_acc": [], "test_loss": [], "test_acc": []}
+    scaler = GradScaler()
 
     for epoch in tqdm(range(epochs)):
         train_loss, train_acc = train_step(
@@ -89,6 +96,7 @@ def train(
             loss_func=loss_func,
             optimizer=optimizer,
             device=device,
+            scaler=scaler,
         )
 
         test_loss, test_acc = test_step(

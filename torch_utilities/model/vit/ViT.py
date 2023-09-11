@@ -3,6 +3,7 @@ import torch
 
 from .transformer_encoder import TransformerEncoderBlock
 from torch_utilities.model.vit.embedding import PatchEmbedding
+from torch_utilities.consts import available_device
 
 
 class ViT(nn.Module):

@@ -37,3 +37,4 @@ def pred_and_plot_image(
 
     plt.title(title)
     plt.axis(False)
+    plt.show()
