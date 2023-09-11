@@ -12,6 +12,10 @@ from torch_utilities.plot import save_grid
 from torch import autocast
 from torch.cuda.amp import GradScaler
 
+"""
+! TODO Take scaler parameter as input because that can be saved for after training
+"""
+
 
 def train_step(
     model: nn.Module,
