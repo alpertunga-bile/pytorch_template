@@ -198,11 +198,16 @@ if __name__ == "__main__":
     test_image_tensor, test_image_cb, test_image_cr = (
         Image.open("dataset/hard_210_1100.jpg").convert("YCbCr").split()
     )
-    test_image_tensor = np.array(test_image_tensor, dtype=np.float32) / 255.0
     test_image_cb = np.array(test_image_cb, dtype=np.float32) / 255.0
     test_image_cr = np.array(test_image_cr, dtype=np.float32) / 255.0
 
-    test_image_tensor = from_numpy(test_image_tensor).unsqueeze(0).to(available_device)
+    test_image_tensor = (
+        transforms.ToTensor()(
+            test_image_tensor.resize((HALF_IMAGE_SIZE, HALF_IMAGE_SIZE))
+        )
+        .unsqueeze(0)
+        .to(available_device)
+    )
 
     output = model(test_image_tensor)
 
