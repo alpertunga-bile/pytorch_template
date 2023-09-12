@@ -29,11 +29,11 @@ def train_step(
 
     train_loss = train_acc = 0.0
 
-    for batch, (X, y) in enumerate(dataloader):
-        X, y = X.to(device), y.to(device)
+    for batch, (x, y) in enumerate(dataloader):
+        x, y = x.to(device), y.to(device)
 
         with autocast(device_type=device):
-            y_pred = model(X)
+            y_pred = model(x)
             loss = loss_func(y_pred, y)
 
         train_loss += loss.item()
@@ -62,11 +62,11 @@ def test_step(
     test_loss = test_acc = 0.0
 
     with inference_mode():
-        for batch, (X, y) in enumerate(dataloader):
-            X, y = X.to(device), y.to(device)
+        for batch, (x, y) in enumerate(dataloader):
+            x, y = x.to(device), y.to(device)
 
             with autocast(device_type=device):
-                test_pred_logits = model(X)
+                test_pred_logits = model(x)
                 loss = loss_func(test_pred_logits, y)
 
             test_loss += loss.item()
