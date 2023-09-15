@@ -1,6 +1,5 @@
 from os import cpu_count
 from torch.cuda import is_available
-from torchvision import transforms
 
 NUM_WORKERS = cpu_count()
 available_device = "cuda" if is_available() else "cpu"
